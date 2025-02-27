@@ -7,16 +7,15 @@ from lxml import html
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-semaphore = asyncio.Semaphore(10)
 
-async def scrape_page(session, id: int):
+async def scrape_page(semaphore, session, id: int):
     url = f"https://breadl.org/d/{id}"
-    retry_options = ExponentialRetry(attempts=3, start_timeout=1)
+    retry_options = ExponentialRetry(attempts=2, start_timeout=3)
     retry_client = RetryClient(session, retry_options=retry_options)
 
     try:
         async with semaphore:
-            async with retry_client.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"}) as response:#to avoid ban, hopefully
+            async with retry_client.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"}) as response:#to avoid ban, hopefully
                 if response.status != 200:
                     logger.warning(f"Error {response.status}: {url}")
                     return None
@@ -51,14 +50,13 @@ async def scrape_page(session, id: int):
         logger.exception(f"Exception fetching {url}: {e}")
         return None
 
-
 async def fetch_data(start_id: int, length: int, concurrency: int, queue: Queue):
-    "Each process runs this function to fetch data and send it to the writer queue"
+    semaphore = asyncio.Semaphore(concurrency)
     tasks = []
 
     async with aiohttp.ClientSession() as session:
         for id in range(start_id, start_id + length):
-            tasks.append(scrape_page(session, id))
+            tasks.append(scrape_page(semaphore, session, id))
 
             if len(tasks) == concurrency:
                 results = await asyncio.gather(*tasks)

@@ -51,7 +51,10 @@ if __name__ == "__main__":
     import sys
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        
+    elif sys.platform != "win32":
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPOlicy())
+    #figure out better way for platform detection    
     start_id = 6
     end_id = 1403112
     proc_num = 4

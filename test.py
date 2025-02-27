@@ -7,10 +7,10 @@ class TestFetchData(unittest.TestCase):
     def test_fetch_data_execution_time(self):
         start_id = 6
         end_id = 1403112
-        proc_num = 8
-        concurrency = 50
+        proc_num = 4
+        concurrency = 20
         buffer_size = 10000 * 5
-        out_file = "E:/libgen_books_and_mirrors.txt"
+        out_file = "libgen_books_and_mirrors.txt"
 
         test_lens = [
             1000,
