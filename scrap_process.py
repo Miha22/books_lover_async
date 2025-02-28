@@ -92,9 +92,9 @@ async def fetch_data(ids: list, total_length: int, ttl: int, concurrency: int, q
     timeouts_prev = timeout_counter.value
     speed = int((len(semaphore_levels) // 2) - 1)
     speed_alter_attempts = len(semaphore_levels) - 3
-
-    start_time = 0
-    end_time = 0
+    # if not semaphore_levels:
+    #     raise ValueError("semaphore_levels is empty! ")
+    start_time = time.time()
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=50, ssl=False)) as session:
         retry_options = ExponentialRetry(attempts=5, start_timeout=2)
         retry_client = RetryClient(session, retry_options=retry_options)
@@ -109,8 +109,11 @@ async def fetch_data(ids: list, total_length: int, ttl: int, concurrency: int, q
             else:
                 if speed_alter_attempts > 0 and speed < len(semaphore_levels) - 1:
                     speed += 1
-                    speed_alter_attempts -= 1
                     #logger.info(f"Speed adjusted to {speed}, attempts left: {speed_alter_attempts}")
+
+            # if speed < 0 or speed >= len(semaphore_levels):
+            #     logger.error(f"Invalid speed index: {speed}, valid range: 0-{len(semaphore_levels) - 1}")
+            #     speed = max(0, min(len(semaphore_levels) - 1, speed))
 
             semaphore = semaphore_levels[speed]
             tasks.append(asyncio.create_task(scrape_page(semaphore, session, retry_client, id, timeout_counter)))
@@ -129,9 +132,15 @@ async def fetch_data(ids: list, total_length: int, ttl: int, concurrency: int, q
                 with ready_counter.get_lock():  
                     ready_counter.value += processed
                     ready = ready_counter.value
-                    logger.info(f"Processed books: {ready}/{total_length} total\nProgress: ({ready / total_length * 100:.2f}%)\n")
-                    #logger.info(f"Processed books: {ready}/{total_length} total\nProgress: ({ready / total_length * 100:.2f}%)\nRecorded Speed: {processed / execution_time:.2f} books/sec.\n")
-                temp_failed = failed_ids.qsize()
+                elapsed_time = time.time() - start_time
+                recorded_speed = ready / elapsed_time if elapsed_time > 0 else 0
+                remaining_books = total_length - ready
+                eta = remaining_books / recorded_speed if recorded_speed > 0 else float('inf')
+
+                logger.info(f"Processed books: {ready}/{total_length} total\n"
+                            f"Progress: ({ready / total_length * 100:.2f}%)\n"
+                            f"Speed: {recorded_speed:.2f} books/sec\n"
+                            f"Estimated time remaining: {eta // 3600}(h.) {(eta % 3600) // 60}(min.) {eta % 60:.0f}(sec.)\n")
                 tasks.clear()
                 
         if tasks:
